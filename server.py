@@ -1,5 +1,8 @@
-#  coding: utf-8 
+#!/usr/bin/env python3
+#  coding: utf-8
+
 import socketserver
+import os
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -32,7 +35,39 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
         print ("Got a request of: %s\n" % self.data)
+
+        msg = "<html><body><h1>This is Zhengdao's page</h1><p>Here is the files</p></body></html>"
+
+        response_headers = {
+            'Content-Type': 'text/html; encoding=utf8',
+            'Content-Length': len(msg),
+            'Connection': 'close',
+        }
+
+        response_headers_raw = ''.join('%s: %s\r\n' % (k, v) for k, v in response_headers.items())
+
+        response_proto = 'HTTP/1.1'
+
+        '''
+        filename = self.data.decode("utf-8").split()
+        file = 'web' + filename[4]
+        print(file)
+        '''
+
+
+        response_status = '200'
+        response_status_text = 'OK'
+        #response_status = '404'
+        #response_status_text = 'not Found'
+        r = '%s %s %s\r\n' % (response_proto, response_status, response_status_text)
+        self.request.send(bytearray(r,"utf-8"))
+        self.request.send(bytearray(response_headers_raw,"utf-8"))
+        self.request.send(bytearray('\r\n',"utf-8"))  # to separate headers from body
+        self.request.send(msg.encode(encoding="utf-8"))
         self.request.sendall(bytearray("OK",'utf-8'))
+
+        f = open("www",)
+
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
@@ -41,6 +76,8 @@ if __name__ == "__main__":
     # Create the server, binding to localhost on port 8080
     server = socketserver.TCPServer((HOST, PORT), MyWebServer)
 
+
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C
     server.serve_forever()
+
