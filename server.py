@@ -3,6 +3,7 @@
 
 import socketserver
 import os
+import re
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -36,37 +37,66 @@ class MyWebServer(socketserver.BaseRequestHandler):
         self.data = self.request.recv(1024).strip()
         print ("Got a request of: %s\n" % self.data)
 
-        msg = "<html><body><h1>This is Zhengdao's page</h1><p>Here is the files</p></body></html>"
+
 
         response_headers = {
-            'Content-Type': 'text/html; encoding=utf8',
-            'Content-Length': len(msg),
+            'Content-Type': 'text/plain; encoding=utf8',
+            #'Content-Length': len(msg),
             'Connection': 'close',
         }
 
         response_headers_raw = ''.join('%s: %s\r\n' % (k, v) for k, v in response_headers.items())
 
-        response_proto = 'HTTP/1.1'
+        request_lines = self.data.splitlines()
+        request_header = str(request_lines[0])
+        rule = re.compile(r'/(.*?) HTTP')
+        request_file_name = re.findall(rule, request_header)
+        print(request_file_name)
 
-        '''
-        filename = self.data.decode("utf-8").split()
-        file = 'web' + filename[4]
-        print(file)
-        '''
+        if self.data:
+            if request_file_name == ['']:
+                data_line = "HTTP/1.1 200 OK\r\n"
+                data_blank = "\r\n"
+                contexts = []
+                css = False
+            elif request_file_name != [''] and os.path.exists(os.getcwd() + '/www/' + request_file_name[0]) == True:
+                if '.css' in request_file_name[0]:
+
+                    css = True
+                else:
+                    css = False
 
 
-        response_status = '200'
-        response_status_text = 'OK'
-        #response_status = '404'
-        #response_status_text = 'not Found'
-        r = '%s %s %s\r\n' % (response_proto, response_status, response_status_text)
-        self.request.send(bytearray(r,"utf-8"))
-        self.request.send(bytearray(response_headers_raw,"utf-8"))
-        self.request.send(bytearray('\r\n',"utf-8"))  # to separate headers from body
-        self.request.send(msg.encode(encoding="utf-8"))
-        self.request.sendall(bytearray("OK",'utf-8'))
+                print(os.getcwd() + '/www/' + request_file_name[0])
+                print(request_file_name[0])
 
-        f = open("www",)
+                data_line = "HTTP/1.1 200 OK\r\n"
+                data_blank = "\r\n"
+                with open(os.getcwd() + '/www/' + request_file_name[0], 'rb') as file:
+                    contexts = file.readlines()
+
+            else:
+                data_line = "HTTP/1.1 404 not found\r\n"
+                data_blank = "\r\n"
+                contexts = []
+                data_body = "<div style='color:red; font-size:60px;'> 404 Not Found!</div>"
+                css = False
+
+        self.request.send(bytearray(response_headers_raw, 'utf-8'))
+        self.request.send(bytearray(data_blank, "utf-8"))
+        self.request.send(bytearray(data_line,"utf-8"))
+        self.request.send(bytearray(data_blank,"utf-8"))  # to separate headers from body
+        #self.request.send(bytearray(response_headers_raw, 'utf-8'))
+
+        if contexts != []:
+            for i in range(len(contexts)):
+                context = contexts[i].decode()
+                self.request.send(bytearray(context,"utf-8"))
+
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -81,3 +111,4 @@ if __name__ == "__main__":
     # interrupt the program with Ctrl-C
     server.serve_forever()
 
+YZD7765538280
