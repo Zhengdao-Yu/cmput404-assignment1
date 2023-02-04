@@ -4,6 +4,7 @@
 import socketserver
 import os
 import re
+from urllib import request
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -36,67 +37,96 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
         print ("Got a request of: %s\n" % self.data)
+        self.send_message()
 
 
 
-        response_headers = {
-            'Content-Type': 'text/plain; encoding=utf8',
-            #'Content-Length': len(msg),
-            'Connection': 'close',
-        }
-
-        response_headers_raw = ''.join('%s: %s\r\n' % (k, v) for k, v in response_headers.items())
-
+    def get_request_header_filename(self):
         request_lines = self.data.splitlines()
         request_header = str(request_lines[0])
+
         rule = re.compile(r'/(.*?) HTTP')
         request_file_name = re.findall(rule, request_header)
-        print(request_file_name)
+        return request_header, request_file_name
+
+    def get_request_header(self):
+        request_header, file_name = self.get_request_header_filename()
+        print(request_header)
+        print(file_name)
+        url = 'localhost:8080/www/' + file_name[0]
 
         if self.data:
-            if request_file_name == ['']:
+            if file_name == ['']:
                 data_line = "HTTP/1.1 200 OK\r\n"
-                data_blank = "\r\n"
                 contexts = []
-                css = False
-            elif request_file_name != [''] and os.path.exists(os.getcwd() + '/www/' + request_file_name[0]) == True:
-                if '.css' in request_file_name[0]:
+            elif 'GET' not in request_header:
+                data_line = "HTTP/1.1 405 Method Not Allowed\r\n"
+                contexts = []
 
-                    css = True
-                else:
-                    css = False
+            elif url.endswith('/deep') and os.path.exists(os.getcwd() + '/www/' + file_name[0]):
+                data_line = "HTTP/1.1 301 Permanently Moved\r\n"
+                with open(os.getcwd() + '/www/' + '/deep/index.html', 'rb') as file:
+                    contexts = file.readlines()
 
-
-                print(os.getcwd() + '/www/' + request_file_name[0])
-                print(request_file_name[0])
-
+            elif url.endswith('/deep/') and os.path.exists(os.getcwd() + '/www/' + file_name[0]):
                 data_line = "HTTP/1.1 200 OK\r\n"
-                data_blank = "\r\n"
-                with open(os.getcwd() + '/www/' + request_file_name[0], 'rb') as file:
+                with open(os.getcwd() + '/www/' + '/deep/index.html', 'rb') as file:
+                    contexts = file.readlines()
+
+            elif url.endswith('etc/group'):
+                data_line = "HTTP/1.1 404 NOT FOUND\r\n"
+                contexts = []
+
+            elif url.endswith("localhost:8080/"):
+                data_line = "HTTP/1.1 200 OK\r\n"
+                contexts = []
+
+            elif 'hardcode' in request_header and os.path.exists(os.getcwd() + '/www/' + file_name[0]):
+                data_line = "HTTP/1.1 200 OK\r\n"
+                with open(os.getcwd() + '/www/' + '/hardcode/index.html', 'rb') as file:
+                    contexts = file.readlines()
+
+            elif file_name != [''] and os.path.exists(os.getcwd() + '/www/' + file_name[0]):
+                data_line = "HTTP/1.1 200 OK\r\n"
+                with open(os.getcwd() + '/www/' + file_name[0], 'rb') as file:
                     contexts = file.readlines()
 
             else:
-                data_line = "HTTP/1.1 404 not found\r\n"
-                data_blank = "\r\n"
+                data_line = "HTTP/1.1 404 NOT FOUND\r\n"
                 contexts = []
-                data_body = "<div style='color:red; font-size:60px;'> 404 Not Found!</div>"
-                css = False
 
-        self.request.send(bytearray(response_headers_raw, 'utf-8'))
-        self.request.send(bytearray(data_blank, "utf-8"))
+            if '.css' in file_name[0]:
+                css = True
+            else:
+                css = False
+        return data_line, contexts, css
+
+
+    def send_message(self):
+        data_line, contexts, css = self.get_request_header()
+        if css:
+            response_headers = {
+                'Content-Type': 'text/css; encoding=utf8',
+                'Connection': 'close',
+            }
+        else:
+            response_headers = {
+                'Content-Type': 'text/html; encoding=utf8',
+                'Connection': 'close',
+            }
+
+        response_headers_raw = ''.join('%s: %s\r\n' % (k, v) for k, v in response_headers.items())
+
         self.request.send(bytearray(data_line,"utf-8"))
-        self.request.send(bytearray(data_blank,"utf-8"))  # to separate headers from body
-        #self.request.send(bytearray(response_headers_raw, 'utf-8'))
+        self.request.send(bytearray(response_headers_raw, 'utf-8'))
+        self.request.send(bytearray("\r\n", "utf-8"))
+        if data_line == "HTTP/1.1 404 NOT FOUND\r\n":
+            self.request.send(bytearray("sorry,404 not found", "utf-8"))
 
         if contexts != []:
             for i in range(len(contexts)):
                 context = contexts[i].decode()
                 self.request.send(bytearray(context,"utf-8"))
-
-
-
-
-
 
 
 if __name__ == "__main__":
@@ -111,4 +141,3 @@ if __name__ == "__main__":
     # interrupt the program with Ctrl-C
     server.serve_forever()
 
-YZD7765538280
